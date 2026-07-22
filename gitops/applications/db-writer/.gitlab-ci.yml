@@ -1,0 +1,29 @@
+stages:
+  - build
+  - deploy
+
+build-and-push:
+  stage: build
+  tags:
+    - build
+  script:
+    - echo "Harbor 로그인 중..."
+    - docker login harbor.ccip.internal -u "$HARBOR_USER" -p "$HARBOR_PASSWORD"
+    - echo "이미지 빌드 중..."
+    - docker build -t harbor.ccip.internal/v2x-core/db-writer:$CI_COMMIT_SHORT_SHA .
+    - docker tag harbor.ccip.internal/v2x-core/db-writer:$CI_COMMIT_SHORT_SHA harbor.ccip.internal/v2x-core/db-writer:latest
+    - echo "Harbor로 push 중..."
+    - docker push harbor.ccip.internal/v2x-core/db-writer:$CI_COMMIT_SHORT_SHA
+    - docker push harbor.ccip.internal/v2x-core/db-writer:latest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy-to-k8s-interior:
+  stage: deploy
+  tags:
+    - ansible-deploy
+  script:
+    - echo "K8s Interior에 db-writer 자동 배포 중..."
+    - ansible-playbook -i /home/user4/db-writer-deploy/inventory.ini /home/user4/db-writer-deploy/deploy-db-writer.yml --vault-password-file /home/user4/.vault_pass
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
